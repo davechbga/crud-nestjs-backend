@@ -46,17 +46,33 @@ export class ProductsService {
     return productFound;
   }
 
-  update(id: number, updateProductDto: UpdateProductDto) {
-    const updatedProduct = this.prismaService.product.update({
-      where: { id },
-      data: updateProductDto,
-    });
+  async update(id: number, updateProductDto: UpdateProductDto) {
+    try {
+      const updatedProduct = await this.prismaService.product.update({
+        where: { id },
+        data: updateProductDto,
+      });
 
-    if (!updatedProduct) {
-      throw new NotFoundException(`Product #${id} not found`);
+      if (!updatedProduct) {
+        throw new NotFoundException(`Product #${id} not found`);
+      }
+
+      return updatedProduct;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        // P2002 es el código de error para violación de restricción única
+        if (error.code === 'P2002') {
+          throw new ConflictException(
+            `Product with name ${updateProductDto.name} already exists`,
+          );
+        }
+        // P2025 es el código para registro no encontrado
+        if (error.code === 'P2025') {
+          throw new NotFoundException(`Product #${id} not found`);
+        }
+      }
+      throw new InternalServerErrorException();
     }
-
-    return updatedProduct;
   }
 
   async remove(id: number) {
